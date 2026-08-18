@@ -25,7 +25,8 @@ struct FoldPickerView: View {
                         onPick(type)
                     } label: {
                         VStack(spacing: 6) {
-                            Text(type.emoji).font(.system(size: 32))
+                            OrigamiGraphic(type: type, color: colorName)
+                                .frame(width: 38, height: 38)
                             Text(type.displayName)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
                                 .foregroundColor(.black.opacity(0.7))

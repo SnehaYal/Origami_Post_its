@@ -15,20 +15,12 @@ struct OrigamiView: View {
     @State private var tilt: Double = 0
 
     var body: some View {
-        ZStack {
-            // Folded-paper placeholder: a tinted diamond so the note's color shows.
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(origami.colorName.color)
-                .frame(width: 70, height: 70)
-                .rotationEffect(.degrees(45))
-                .shadow(color: .black.opacity(0.22), radius: 5, x: 0, y: 3)
-
-            Text(origami.type.emoji)
-                .font(.system(size: 44))
-        }
-        .rotationEffect(.degrees(tilt))
-        .frame(width: 110, height: 110)
-        .contentShape(Rectangle())
+        OrigamiGraphic(type: origami.type, color: origami.colorName)
+            .frame(width: 84, height: 84)
+            .shadow(color: .black.opacity(0.22), radius: 5, x: 0, y: 3)
+            .rotationEffect(.degrees(tilt))
+            .frame(width: 110, height: 110)
+            .contentShape(Rectangle())
         .contextMenu {
             Button("Change color") { onChangeColor() }
             Button("Delete", role: .destructive) { onDelete() }

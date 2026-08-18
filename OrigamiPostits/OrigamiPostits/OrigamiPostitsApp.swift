@@ -31,6 +31,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Restore saved origamis and notes.
         OrigamiManager.shared.load()
         NoteManager.shared.load()
+        // Show the floating "add post-it" launcher.
+        AddButtonController.shared.show()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

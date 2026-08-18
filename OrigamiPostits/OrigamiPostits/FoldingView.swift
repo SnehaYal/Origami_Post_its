@@ -2,14 +2,12 @@ import AppKit
 import SwiftUI
 import Combine
 
-// MARK: - Phase 2: the hands-on folding
+// MARK: - Hands-on folding, driven by per-origami recipes
 //
-// You grab the glowing corner, drag it to the target in the center, and release
-// to set the crease. Repeat for each corner, then a small sparkle plays and the
-// origami drops onto the desktop.
-//
-// This is the mechanic v1: a forgiving "fold the corners in" sequence shared by
-// all four origamis. Per-origami crease recipes + real paper art come next.
+// You grab (anywhere on the paper) and drag toward the dashed target, releasing
+// to set each crease. Each origami has its own sequence of folds (see
+// FoldRecipes). When the last fold sets, a sparkle plays and the origami drops
+// onto the desktop.
 
 struct FoldingView: View {
     let type: OrigamiType
@@ -18,8 +16,6 @@ struct FoldingView: View {
     var onCancel: () -> Void
 
     private let side: CGFloat = 280
-    // Order the corners are folded in.
-    private let order: [Int] = [0, 1, 2, 3]
 
     // Unit square corners (SwiftUI coords: y increases downward).
     private let unit: [CGPoint] = [
@@ -29,15 +25,15 @@ struct FoldingView: View {
         CGPoint(x: 0, y: 1)  // 3 bottom-left
     ]
 
+    private var steps: [FoldStep] { FoldRecipes.recipe(for: type) }
+
     @State private var step = 0
     @State private var tip: CGPoint? = nil     // live position of the grabbed corner
-    @State private var committed: [Int] = []
     @State private var finished = false
     @State private var sparkle = false
 
     // Geometry helpers
     private func p(_ u: CGPoint) -> CGPoint { CGPoint(x: u.x * side, y: u.y * side) }
-    private var center: CGPoint { p(CGPoint(x: 0.5, y: 0.5)) }
     private func neighbors(_ i: Int) -> (CGPoint, CGPoint) {
         (p(unit[(i + 1) % 4]), p(unit[(i + 3) % 4]))
     }
@@ -50,13 +46,15 @@ struct FoldingView: View {
         CGPoint(x: min(max(pt.x, 0), side), y: min(max(pt.y, 0), side))
     }
     private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
-    private var activeCorner: Int { step < order.count ? order[step] : -1 }
+
+    private var activeCorner: Int { step < steps.count ? steps[step].grab : -1 }
+    private var currentTarget: CGPoint { p(steps[min(step, steps.count - 1)].target) }
 
     var body: some View {
         VStack(spacing: 14) {
             Text(finished
                  ? "Your \(type.displayName.lowercased()) is ready!"
-                 : "Fold the paper — step \(min(step + 1, order.count)) of \(order.count)")
+                 : "Fold the \(type.displayName.lowercased()) — step \(min(step + 1, steps.count)) of \(steps.count)")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundColor(.black.opacity(0.8))
 
@@ -95,15 +93,14 @@ struct FoldingView: View {
 
     private var paper: some View {
         ZStack {
-            // Base sheet
             RoundedRectangle(cornerRadius: 6)
                 .fill(colorName.color)
                 .frame(width: side, height: side)
                 .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
 
             // Folds already set
-            ForEach(committed, id: \.self) { i in
-                foldLayer(i)
+            ForEach(Array(0..<step), id: \.self) { idx in
+                foldLayer(steps[idx])
             }
 
             // The corner you're folding right now
@@ -111,7 +108,6 @@ struct FoldingView: View {
                 activeLayer(activeCorner)
             }
 
-            // Reward sparkle
             if sparkle {
                 Image(systemName: "sparkles")
                     .font(.system(size: 64))
@@ -123,11 +119,12 @@ struct FoldingView: View {
     }
 
     @ViewBuilder
-    private func foldLayer(_ i: Int) -> some View {
-        let (a, b) = neighbors(i)
+    private func foldLayer(_ s: FoldStep) -> some View {
+        let (a, b) = neighbors(s.grab)
+        let t = p(s.target)
         ZStack {
-            tri(a, center, b).fill(colorName.color)
-            tri(a, center, b).fill(Color.black.opacity(0.06))
+            tri(a, t, b).fill(colorName.color)
+            tri(a, t, b).fill(Color.black.opacity(0.06))
             Path { pth in pth.move(to: a); pth.addLine(to: b) }
                 .stroke(Color.black.opacity(0.15), lineWidth: 1)
         }
@@ -139,20 +136,17 @@ struct FoldingView: View {
         let cornerPt = p(unit[i])
         let tp = tip ?? cornerPt
         ZStack {
-            // Flap following the finger
             tri(a, tp, b)
                 .fill(colorName.color)
                 .overlay(tri(a, tp, b).fill(Color.black.opacity(0.05)))
                 .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
 
-            // Dashed target in the center
             Circle()
                 .strokeBorder(Color.black.opacity(0.35),
                               style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                 .frame(width: 26, height: 26)
-                .position(center)
+                .position(currentTarget)
 
-            // Glowing grab handle
             Circle()
                 .fill(Color.white.opacity(0.9))
                 .overlay(Circle().stroke(Color.black.opacity(0.25), lineWidth: 1))
@@ -168,12 +162,12 @@ struct FoldingView: View {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("paper"))
             .onChanged { value in
                 guard !finished, activeCorner >= 0 else { return }
-                // Grab from anywhere on the paper and drag toward the center.
+                // Grab from anywhere on the paper and drag toward the target.
                 tip = clamp(value.location)
             }
             .onEnded { value in
                 guard !finished, activeCorner >= 0, tip != nil else { return }
-                if dist(clamp(value.location), center) <= 42 {
+                if dist(clamp(value.location), currentTarget) <= 44 {
                     commitFold()
                 } else {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { tip = nil }
@@ -184,18 +178,15 @@ struct FoldingView: View {
     // MARK: Actions
 
     private func commitFold() {
-        let i = activeCorner
         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-            committed.append(i)
             tip = nil
             step += 1
         }
-        if step >= order.count { finish() }
+        if step >= steps.count { finish() }
     }
 
     private func autoComplete() {
-        for idx in step..<order.count { committed.append(order[idx]) }
-        step = order.count
+        step = steps.count
         tip = nil
         finish()
     }
@@ -221,7 +212,7 @@ final class FoldingController {
         panel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 392),
                               activating: true)
         panel.minSize = NSSize(width: 340, height: 392)
-        // IMPORTANT: let mouse drags reach the paper instead of moving the window.
+        // Let mouse drags reach the paper instead of moving the window.
         panel.isMovableByWindowBackground = false
 
         let root = FoldingView(type: type, colorName: colorName,
@@ -272,4 +263,3 @@ final class FoldingCoordinator {
         controller.show()
     }
 }
-
