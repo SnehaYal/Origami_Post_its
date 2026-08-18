@@ -11,6 +11,7 @@ struct NoteView: View {
     @ObservedObject var note: StickyNote
     var onClose: () -> Void
     var onFold: () -> Void
+    var onTuck: () -> Void
 
     @State private var newItemText: String = ""
 
@@ -32,6 +33,14 @@ struct NoteView: View {
                         .onTapGesture { note.colorName = swatch }
                 }
                 Spacer()
+                // Tuck this note away to the left-edge tray.
+                Button(action: onTuck) {
+                    Image(systemName: "tray.and.arrow.down")
+                        .foregroundColor(.black.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+                .help("Tuck this note away to the side")
+
                 // Fold into an origami (available any time, for testing/whenever).
                 Button(action: onFold) {
                     Image(systemName: "wand.and.stars")
