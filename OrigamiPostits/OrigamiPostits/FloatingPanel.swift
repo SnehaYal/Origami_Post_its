@@ -46,7 +46,11 @@ final class NotePanelController {
         let frame = NSRect(x: 0, y: 0, width: 240, height: 280)
         panel = FloatingPanel(contentRect: frame)
 
-        let root = NoteView(note: note, onClose: { [weak self] in self?.close() })
+        let root = NoteView(
+            note: note,
+            onClose: { [weak self] in self?.close() },
+            onFold: { [weak self] in self?.fold() }
+        )
         panel.contentView = NSHostingView(rootView: root)
 
         // Drop it somewhere near the middle of the screen, with a little scatter
@@ -67,5 +71,17 @@ final class NotePanelController {
     func close() {
         panel.close()
         onClose(note.id)
+    }
+
+    /// Open the "What do you want to make?" picker. On a pick, fold this note
+    /// into that origami where the note currently sits, then close the note.
+    func fold() {
+        let frame = panel.frame
+        let color = note.colorName
+        FoldCoordinator.shared.present(colorName: color, near: frame) { [weak self] type in
+            guard let self = self else { return }
+            OrigamiManager.shared.spawn(type: type, color: color, at: frame)
+            self.close()
+        }
     }
 }

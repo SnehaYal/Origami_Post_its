@@ -9,6 +9,8 @@ final class StickyNote: ObservableObject, Identifiable {
     @Published var text: String = ""
     @Published var items: [ChecklistItem] = []
     @Published var colorName: NoteColor = .yellow
+    /// True once every to-do is checked — drives the "ready to fold" nudge.
+    @Published var isReadyToFold: Bool = false
 }
 
 /// One to-do line inside a note.

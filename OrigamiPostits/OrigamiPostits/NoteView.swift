@@ -10,6 +10,7 @@ import Combine
 struct NoteView: View {
     @ObservedObject var note: StickyNote
     var onClose: () -> Void
+    var onFold: () -> Void
 
     @State private var newItemText: String = ""
 
@@ -31,6 +32,14 @@ struct NoteView: View {
                         .onTapGesture { note.colorName = swatch }
                 }
                 Spacer()
+                // Fold into an origami (available any time, for testing/whenever).
+                Button(action: onFold) {
+                    Image(systemName: "wand.and.stars")
+                        .foregroundColor(.black.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+                .help("Fold this note into an origami")
+
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.black.opacity(0.35))
@@ -71,6 +80,25 @@ struct NoteView: View {
             }
             .frame(maxHeight: .infinity)
 
+            // Nudge: appears once every to-do is checked.
+            if note.isReadyToFold {
+                Button(action: onFold) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                        Text("Fold this note")
+                    }
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(.black.opacity(0.8))
+                    .padding(.vertical, 7)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.5))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
             // Add a new to-do
             HStack(spacing: 6) {
                 Image(systemName: "plus")
@@ -102,9 +130,12 @@ struct NoteView: View {
     }
 
     private func checkAllDone() {
-        guard !note.items.isEmpty, note.items.allSatisfy({ $0.isDone }) else { return }
-        // 👉 Phase 1 hook: this is where the "What do you want to make right now?"
-        //    fold pop-up (nudge) will fire. For Phase 0 we just log it.
-        print("✅ All items done — this note is ready to fold!")
+        let allDone = !note.items.isEmpty && note.items.allSatisfy { $0.isDone }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            note.isReadyToFold = allDone
+        }
+        if allDone {
+            print("✅ All items done — this note is ready to fold!")
+        }
     }
 }
