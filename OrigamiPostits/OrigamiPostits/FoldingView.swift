@@ -63,6 +63,10 @@ struct FoldingView: View {
                 .coordinateSpace(name: "paper")
                 .contentShape(Rectangle())
                 .gesture(dragGesture)
+                .onHover { inside in
+                    if inside && !finished { NSCursor.openHand.set() }
+                    else { NSCursor.arrow.set() }
+                }
 
             HStack {
                 Button("Cancel") { onCancel() }
@@ -200,7 +204,7 @@ struct FoldingView: View {
 
 // MARK: - Folding panel + coordinator
 
-final class FoldingController {
+final class FoldingController: FoldPresenter {
     private let panel: FloatingPanel
 
     init(type: OrigamiType,
@@ -237,7 +241,7 @@ final class FoldingController {
 
 final class FoldingCoordinator {
     static let shared = FoldingCoordinator()
-    private var current: FoldingController?
+    private var current: FoldPresenter?
     private init() {}
 
     func present(type: OrigamiType,
@@ -245,21 +249,29 @@ final class FoldingCoordinator {
                  near noteFrame: NSRect,
                  onComplete: @escaping () -> Void) {
         current?.close()
-        let controller = FoldingController(
-            type: type,
-            colorName: colorName,
-            near: noteFrame,
-            onComplete: { [weak self] in
-                onComplete()
-                self?.current?.close()
-                self?.current = nil
-            },
-            onCancel: { [weak self] in
-                self?.current?.close()
-                self?.current = nil
-            }
-        )
-        current = controller
-        controller.show()
+
+        let complete: () -> Void = { [weak self] in
+            onComplete()
+            self?.current?.close()
+            self?.current = nil
+        }
+        let cancel: () -> Void = { [weak self] in
+            self?.current?.close()
+            self?.current = nil
+        }
+
+        // Use the real learn-to-fold lesson if we've authored one; otherwise the
+        // generic fold mechanic.
+        if let steps = OrigamiLessons.lesson(for: type) {
+            let controller = LessonController(type: type, steps: steps, colorName: colorName,
+                                              near: noteFrame, onComplete: complete, onCancel: cancel)
+            current = controller
+            controller.show()
+        } else {
+            let controller = FoldingController(type: type, colorName: colorName,
+                                               near: noteFrame, onComplete: complete, onCancel: cancel)
+            current = controller
+            controller.show()
+        }
     }
 }
